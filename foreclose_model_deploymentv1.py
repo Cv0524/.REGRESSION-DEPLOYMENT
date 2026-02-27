@@ -56,7 +56,7 @@ DEFAULT_ENCODED_VALUES = {}
 # Base directory = where this script lives (good for Streamlit Cloud)
 BASE = Path(__file__).resolve().parent
 
-@st.cache_resource
+#@st.cache_resource
 def load_artifacts(base_dir: Path):
     feature_cols = joblib.load(base_dir / "feature_cols.pkl")
     lot_area_q75 = joblib.load(base_dir / "lot_area_q75.pkl")
@@ -174,3 +174,4 @@ with col2:
 
         styled = pred_table.style.format({"Pred_price": "₱{:,.2f}"})
         st.dataframe(styled, use_container_width=True)
+
