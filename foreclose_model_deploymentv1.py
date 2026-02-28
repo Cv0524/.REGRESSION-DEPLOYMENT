@@ -115,7 +115,7 @@ required = [
 ]
 missing = [f for f in required if not (BASE / f).exists()]
 if missing:
-    st.error("Missing required files in app folder:\\n- " + "\\n- ".join(missing))
+    st.error("Missing required files in app folder:\\\\n- " + "\\\\n- ".join(missing))
     st.stop()
 
 feature_cols, lot_area_q75, scaler, models = load_artifacts(BASE)
@@ -174,6 +174,3 @@ with col2:
 
         styled = pred_table.style.format({"Pred_price": "₱{:,.2f}"})
         st.dataframe(styled, use_container_width=True)
-
-improve the app add cacthing error if the user type to much value.
-also add some visual to better understand by the user
