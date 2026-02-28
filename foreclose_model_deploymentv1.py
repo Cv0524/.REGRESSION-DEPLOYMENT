@@ -75,8 +75,8 @@ CATEGORY_MAPS = {
 }
 DEFAULT_ENCODED_VALUES = {}
 
-MAX_LOT_AREA    = 1_000.0   # ← updated to 1000
-MAX_FLOOR_AREA  = 1_000.0   # ← updated to 1000
+MAX_LOT_AREA    = 2000   # ← updated to 1000
+MAX_FLOOR_AREA  = 2000   # ← updated to 1000
 WARN_LOT_AREA   = 800.0
 WARN_FLOOR_AREA = 800.0
 
@@ -395,3 +395,4 @@ with col2:
                 [{"Field": k, "Value": v} for k, v in last.items()]
             )
             st.dataframe(recap, use_container_width=True, hide_index=True)
+
