@@ -76,10 +76,8 @@ CATEGORY_MAPS = {
 }
 DEFAULT_ENCODED_VALUES = {}
 
-# Hard limits – anything beyond these is almost certainly a data-entry error
-MAX_LOT_AREA   = 50_000.0   # 50,000 sqm  (~5 hectares, very generous upper bound)
-MAX_FLOOR_AREA = 20_000.0   # 20,000 sqm
-# Soft "unusual but possible" thresholds – triggers a yellow warning only
+MAX_LOT_AREA   = 50_000.0
+MAX_FLOOR_AREA = 20_000.0
 WARN_LOT_AREA   = 5_000.0
 WARN_FLOOR_AREA = 2_000.0
 
@@ -94,10 +92,10 @@ def load_artifacts(base_dir: Path):
     lot_area_q75  = joblib.load(base_dir / "lot_area_q75.pkl")
     scaler        = joblib.load(base_dir / "scaler.pkl")
     models = {
-        "Linear Reg":              joblib.load(base_dir / "linear_reg.pkl"),
-        "Ridge (Tuned)":           joblib.load(base_dir / "ridge_tuned.pkl"),
-        "Lasso (Tuned)":           joblib.load(base_dir / "lasso_tuned.pkl"),
-        "Random Forest (Tuned)":   joblib.load(base_dir / "rf_tuned.pkl"),
+        "Linear Reg":                joblib.load(base_dir / "linear_reg.pkl"),
+        "Ridge (Tuned)":             joblib.load(base_dir / "ridge_tuned.pkl"),
+        "Lasso (Tuned)":             joblib.load(base_dir / "lasso_tuned.pkl"),
+        "Random Forest (Tuned)":     joblib.load(base_dir / "rf_tuned.pkl"),
         "Gradient Boosting (Tuned)": joblib.load(base_dir / "gb_tuned.pkl"),
     }
     return feature_cols, lot_area_q75, scaler, models
@@ -107,14 +105,8 @@ def load_artifacts(base_dir: Path):
 # Input Validation
 # ==========================
 def validate_inputs(lot_area: float, floor_area: float) -> tuple[list[str], list[str]]:
-    """
-    Returns (errors, warnings).
-    Errors   → block prediction entirely.
-    Warnings → show yellow notice but still allow prediction.
-    """
     errors, warnings = [], []
 
-    # --- Hard errors ---
     if lot_area <= 0:
         errors.append("Lot Area must be greater than 0 sqm.")
     if floor_area <= 0:
@@ -135,7 +127,6 @@ def validate_inputs(lot_area: float, floor_area: float) -> tuple[list[str], list
             f"({lot_area:,.2f} sqm). Please review your values."
         )
 
-    # --- Soft warnings (only when no hard errors) ---
     if not errors:
         if lot_area > WARN_LOT_AREA:
             warnings.append(
@@ -172,10 +163,10 @@ def build_features_from_user(
     lot_area_orig = np.expm1(df["LOT AREA (sqm)"])
     floor_orig    = np.expm1(df["FLOOR AREA (sqm)"])
 
-    df["TOTAL_AREA"]        = df["LOT AREA (sqm)"] + df["FLOOR AREA (sqm)"]
+    df["TOTAL_AREA"]         = df["LOT AREA (sqm)"] + df["FLOOR AREA (sqm)"]
     df["FLOOR_TO_LOT_RATIO"] = np.log1p(floor_orig / (lot_area_orig + 1))
-    df["LOG_LOT_x_FLOOR"]   = df["LOT AREA (sqm)"] * df["FLOOR AREA (sqm)"]
-    df["IS_LARGE_PROPERTY"] = (df["LOT AREA (sqm)"] >= lot_area_q75).astype(int)
+    df["LOG_LOT_x_FLOOR"]    = df["LOT AREA (sqm)"] * df["FLOOR AREA (sqm)"]
+    df["IS_LARGE_PROPERTY"]  = (df["LOT AREA (sqm)"] >= lot_area_q75).astype(int)
 
     return df.reindex(columns=feature_cols, fill_value=0).astype(float)
 
@@ -199,11 +190,11 @@ def predict_all_models(
 # Chart Helpers
 # ==========================
 MODEL_COLOR_MAP = {
-    "Linear Reg":               "#6366F1",
-    "Ridge (Tuned)":            "#0EA5E9",
-    "Lasso (Tuned)":            "#22D3EE",
-    "Random Forest (Tuned)":    "#10B981",
-    "Gradient Boosting (Tuned)":"#1D4ED8",
+    "Linear Reg":                "#6366F1",
+    "Ridge (Tuned)":             "#0EA5E9",
+    "Lasso (Tuned)":             "#22D3EE",
+    "Random Forest (Tuned)":     "#10B981",
+    "Gradient Boosting (Tuned)": "#1D4ED8",
 }
 
 def bar_chart_predictions(pred_table: pd.DataFrame) -> go.Figure:
@@ -242,56 +233,7 @@ def bar_chart_predictions(pred_table: pd.DataFrame) -> go.Figure:
     return fig
 
 
-def range_indicator_chart(p_min: float, p_med: float, p_max: float) -> go.Figure:
-    """A simple bullet-style range strip with three annotated markers."""
-    pad   = (p_max - p_min) * 0.15 if p_max > p_min else p_max * 0.10
-    x_lo  = max(0, p_min - pad)
-    x_hi  = p_max + pad
-
-    fig = go.Figure()
-
-    # Shaded range band
-    fig.add_shape(
-        type="rect", xref="x", yref="paper",
-        x0=p_min, x1=p_max, y0=0.3, y1=0.7,
-        fillcolor="rgba(29,78,216,0.15)", line_width=0,
-    )
-
-    # Three vertical marker lines
-    for val, label, color in [
-        (p_min, "Min",    "#10B981"),
-        (p_med, "Median", "#1D4ED8"),
-        (p_max, "Max",    "#EF4444"),
-    ]:
-        fig.add_shape(
-            type="line", xref="x", yref="paper",
-            x0=val, x1=val, y0=0.2, y1=0.8,
-            line=dict(color=color, width=3),
-        )
-        fig.add_annotation(
-            x=val, y=1.0, xref="x", yref="paper",
-            text=f"<b>{label}</b><br>₱{val:,.0f}",
-            showarrow=False,
-            font=dict(size=11, color=color, family="Poppins"),
-            align="center",
-        )
-
-    fig.update_layout(
-        xaxis=dict(range=[x_lo, x_hi], tickprefix="₱", tickformat=",.0f",
-                   gridcolor="#E2E8F0", showline=False),
-        yaxis=dict(visible=False),
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(l=10, r=10, t=60, b=20),
-        height=120,
-        font=dict(family="Poppins"),
-        title=dict(text="Price Range Across All Models",
-                   font=dict(size=14, family="Poppins", color="#0F172A")),
-    )
-    return fig
-
-
 def pie_variance_chart(pred_table: pd.DataFrame) -> go.Figure:
-    """Donut chart showing each model's share of the total predicted sum."""
     colors = [MODEL_COLOR_MAP.get(m, "#94A3B8") for m in pred_table["Model"]]
     fig = go.Figure(
         go.Pie(
@@ -389,7 +331,6 @@ with col1:
         **cat_inputs,
     }
 
-    # --- Live validation feedback (before clicking) ---
     live_errors, live_warns = validate_inputs(lot_area, floor_area)
     for w in live_warns:
         st.markdown(f'<div class="warn-box">⚠️ {w}</div>', unsafe_allow_html=True)
@@ -400,7 +341,7 @@ with col1:
         "🔍 Predict Minimum Bid Price",
         use_container_width=True,
         type="primary",
-        disabled=bool(live_errors),   # ← button is greyed out when errors exist
+        disabled=bool(live_errors),
     )
 
     if predict_clicked and not live_errors:
@@ -417,7 +358,6 @@ with col2:
     if pred_table is None:
         st.info("Fill in the property details on the left, then click **Predict**.")
 
-        # Decorative placeholder chart
         placeholder_fig = go.Figure()
         placeholder_fig.add_annotation(
             text="📈 Your predictions will appear here",
@@ -438,7 +378,6 @@ with col2:
         p_med = float(pred_table["Pred_price"].median())
         spread_pct = ((p_max - p_min) / p_med * 100) if p_med > 0 else 0.0
 
-        # --- Summary metrics ---
         style_metric_cards(
             border_left_color="#1D4ED8",
             background_color="rgba(255, 255, 255, 0.92)",
@@ -450,7 +389,6 @@ with col2:
         m4.metric("📐 Spread", f"{spread_pct:.1f}%",
                   help="(Max − Min) / Median — model disagreement level")
 
-        # --- Confidence interpretation badge ---
         if spread_pct < 10:
             badge = "🟢 **High agreement** across models — estimate is reliable."
         elif spread_pct < 30:
@@ -458,12 +396,6 @@ with col2:
         else:
             badge = "🔴 **High spread** — models disagree; treat estimates as a wide range."
         st.markdown(f"> {badge}")
-
-        # --- Range indicator strip ---
-        st.plotly_chart(
-            range_indicator_chart(p_min, p_med, p_max),
-            use_container_width=True,
-        )
 
         # --- Bar + Donut side-by-side ---
         vc1, vc2 = st.columns([1.5, 1])
@@ -474,7 +406,6 @@ with col2:
 
         # --- Detailed table ---
         with st.expander("📋 Full Prediction Table", expanded=False):
-            # Highlight the lowest prediction in green
             def highlight_min(row):
                 is_min = row["Pred_price"] == pred_table["Pred_price"].min()
                 return ["background-color: #D1FAE5; font-weight:700" if is_min else "" for _ in row]
@@ -487,7 +418,7 @@ with col2:
             )
             st.dataframe(styled, use_container_width=True)
 
-        # --- Input summary recap ---
+        # --- Input recap ---
         with st.expander("🔎 Input Used for This Prediction", expanded=False):
             last = st.session_state.last_input
             recap = pd.DataFrame(
